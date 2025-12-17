@@ -58,9 +58,9 @@ class TextDataset:
             else:
                 self.raw_texts = self.data['text'].tolist()
             
-            # Initialize cleaned texts list (mutable object)
             self.cleaned_texts = []
             self.file_path = file_path
+            self._temp_file_path = None
             
         except pd.errors.EmptyDataError:
             raise ValueError("File is empty or corrupted")
@@ -73,7 +73,7 @@ class TextDataset:
         and converting to lowercase.
         
         Args:
-            text (str): Raw text string (immutable object)
+            text (str): Raw text string
             
         Returns:
             str: Cleaned text string
@@ -89,7 +89,6 @@ class TextDataset:
         Preprocess all texts in the dataset using map and lambda.
         Stores cleaned texts in the cleaned_texts list.
         """
-        # Use map and lambda for text transformation
         self.cleaned_texts = list(map(lambda x: self.clean_text(x), self.raw_texts))
     
     def filter_tokens(self, min_length: int = 3) -> List[str]:
@@ -102,10 +101,8 @@ class TextDataset:
         Returns:
             List[str]: List of filtered tokens
         """
-        # List comprehension for filtering
         all_tokens = []
         for text in self.cleaned_texts:
-            # Split text into tokens and filter by length
             tokens = [token for token in text.split() if len(token) >= min_length]
             all_tokens.extend(tokens)
         return all_tokens
@@ -124,14 +121,12 @@ class TextDataset:
         if not self.cleaned_texts:
             self.preprocess()
         
-        # Generator expression approach
         for i in range(0, len(self.cleaned_texts), batch_size):
             yield self.cleaned_texts[i:i + batch_size]
     
     def get_word_frequencies(self) -> dict:
         """
         Calculate word frequencies from cleaned texts.
-        Returns a dictionary (mutable object).
         
         Returns:
             dict: Dictionary mapping words to their frequencies
@@ -139,7 +134,6 @@ class TextDataset:
         if not self.cleaned_texts:
             self.preprocess()
         
-        # Dictionary to store frequencies (mutable)
         freq_dict = {}
         for text in self.cleaned_texts:
             for word in text.split():
@@ -148,12 +142,11 @@ class TextDataset:
     
     def get_sentiment_categories(self) -> Tuple[str, ...]:
         """
-        Return sentiment categories as a tuple (immutable object).
+        Return sentiment categories as a tuple.
         
         Returns:
             Tuple[str, ...]: Tuple of sentiment category names
         """
-        # Tuple of sentiment categories (immutable)
         categories = ('positive', 'neutral', 'negative')
         return categories
     
@@ -171,7 +164,6 @@ class TextDataset:
         if not isinstance(other, TextDataset):
             raise ValueError("Can only merge with another TextDataset")
         
-        # Create a temporary file or in-memory dataset
         import tempfile
         import pandas as pd
         
@@ -180,11 +172,14 @@ class TextDataset:
         
         # Create temporary file
         temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False)
-        combined_data.to_csv(temp_file.name, index=False)
+        temp_file_path = temp_file.name
+        combined_data.to_csv(temp_file_path, index=False)
         temp_file.close()
         
         # Create new merged dataset
-        merged = TextDataset(temp_file.name)
+        merged = TextDataset(temp_file_path)
+        # Store temp file path for potential cleanup
+        merged._temp_file_path = temp_file_path
         return merged
     
     def __str__(self) -> str:
@@ -200,6 +195,18 @@ class TextDataset:
     def __repr__(self) -> str:
         """Return string representation."""
         return self.__str__()
+    
+    def cleanup_temp_file(self) -> None:
+        """
+        Clean up temporary file if this dataset was created from a merge operation.
+        Only call this when you're done using the merged dataset.
+        """
+        if hasattr(self, '_temp_file_path') and self._temp_file_path and os.path.exists(self._temp_file_path):
+            try:
+                os.unlink(self._temp_file_path)
+                self._temp_file_path = None
+            except Exception:
+                pass  # Ignore cleanup errors
 
 
 # Module-level code using __name__

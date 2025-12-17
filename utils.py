@@ -68,10 +68,9 @@ def generate_report(analyzer, output_file: str = 'sentiment_report.json') -> Non
         'summary': stats,
         'sentiment_counts': analyzer.sentiment_counts,
         'total_analyzed': len(analyzer.results),
-        'sample_results': analyzer.results[:5]  # First 5 results as sample
+        'sample_results': analyzer.results[:5]
     }
     
-    # Write to JSON file (data I/O)
     try:
         with open(output_file, 'w') as f:
             json.dump(report, f, indent=2)
